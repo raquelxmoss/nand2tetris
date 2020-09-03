@@ -7,7 +7,7 @@
  * The ALU (Arithmetic Logic Unit).
  * Computes one of the following functions:
  * x+y, x-y, y-x, 0, 1, -1, x, y, -x, -y, !x, !y,
- * x+1, y+1, x-1, y-1, x&y, x|y on two 16-bit inputs, 
+ * x+1, y+1, x-1, y-1, x&y, x|y on two 16-bit inputs,
  * according to 6 input bits denoted zx,nx,zy,ny,f,no.
  * In addition, the ALU computes two 1-bit outputs:
  * if the ALU output == 0, zr is set to 1; otherwise zr is set to 0;
@@ -27,8 +27,8 @@
 // if (out < 0) set ng = 1
 
 CHIP ALU {
-    IN  
-        x[16], y[16],  // 16-bit inputs        
+    IN
+        x[16], y[16],  // 16-bit inputs
         zx, // zero the x input?
         nx, // negate the x input?
         zy, // zero the y input?
@@ -36,11 +36,45 @@ CHIP ALU {
         f,  // compute out = x + y (if 1) or x & y (if 0)
         no; // negate the out output?
 
-    OUT 
+    OUT
         out[16], // 16-bit output
         zr, // 1 if (out == 0), 0 otherwise
         ng; // 1 if (out < 0),  0 otherwise
 
     PARTS:
    // Put you code here:
-}
+   // if (zx == 1) set x = 0
+   Mux16(sel=zx, a=x, b=false, out=x1);
+
+   // if (nx == 1) set x = !x
+   Not16(in=x1, out=notX1);
+   Mux16(sel=nx, a=x1, b=notX1, out=x2);
+
+   // if (zy == 1) set y = 0
+   Mux16(sel=zy, a=y, b=false, out=y1);
+
+   // if (ny == 1) set y = !y
+   Not16(in=y1, out=notY1);
+   Mux16(sel=nx, a=y1, b=notY1, out=y2);
+
+   // if (f == 1)  set out = x + y
+   // if (f == 0)  set out = x & y
+
+   Add16(a=x2, b=y2, out=aPlusB);
+   And16(a=x2, b=y2, out=aAndB);
+
+   Mux16(sel=f, a=aAndB, b=aPlusB, out=out1);
+
+   // if (no == 1) set out = !out
+
+   Not16(in=out1, out=notOut1);
+   Mux16(sel=no, a=out1, b=notOut1, out=out2, out[0..7]=out7, out[8..15]=out15, out[15]=isng);
+
+   // if (out == 0) set zr = 1
+   Or8Way(in=out7, out=zr0);
+   Or8Way(in=out15, out=zr1);
+   Or(a=zr0, b=zr1, out=zr2);
+   Not(in=zr2, out=zr);
+
+   And(a=isng, b=true, out=ng);
+ }
